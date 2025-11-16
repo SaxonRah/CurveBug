@@ -40,15 +40,31 @@ jobs:
       run: |
         brew install cmake
 
-    - name: Clone raylib
+    - name: Clone and patch raylib
       run: |
-        git clone https://github.com/raysan5/raylib.git external/raylib
+        git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git external/raylib
+      shell: bash
+
+    - name: Patch raylib CMakeLists.txt (Unix)
+      if: runner.os != 'Windows'
+      run: |
         cd external/raylib
-        git checkout 5.0
+        # Replace the first line with a compatible cmake version
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          # macOS uses BSD sed
+          sed -i '' '1s/.*/cmake_minimum_required(VERSION 3.15)/' CMakeLists.txt
+        else
+          # Linux uses GNU sed
+          sed -i '1s/.*/cmake_minimum_required(VERSION 3.15)/' CMakeLists.txt
+        fi
+        echo "Patched CMakeLists.txt first line:"
+        head -n 1 CMakeLists.txt
+      shell: bash
 
     - name: Clone raygui
       run: |
-        git clone https://github.com/raysan5/raygui.git external/raygui
+        git clone --depth 1 --branch 4.0 https://github.com/raysan5/raygui.git external/raygui
+      shell: bash
 
     - name: Configure CMake
       run: |
