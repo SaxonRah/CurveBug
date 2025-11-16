@@ -1,0 +1,204 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Windows MSVC"
+            os: windows-latest
+            artifact: "curvebug-windows-x64"
+            build_type: "Release"
+            cc: "cl"
+            cxx: "cl"
+            archiver: "7z a"
+            generators: "Visual Studio 17 2022"
+            
+          - name: "Ubuntu GCC"
+            os: ubuntu-latest
+            artifact: "curvebug-linux-x64"
+            build_type: "Release"
+            cc: "gcc"
+            cxx: "g++"
+            archiver: "tar czf"
+            generators: "Unix Makefiles"
+            
+          - name: "macOS Clang"
+            os: macos-latest
+            artifact: "curvebug-macos-universal"
+            build_type: "Release"
+            cc: "clang"
+            cxx: "clang++"
+            archiver: "tar czf"
+            generators: "Unix Makefiles"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSVC (Windows)
+      if: runner.os == 'Windows'
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libx11-dev \
+          libxrandr-dev \
+          libxi-dev \
+          libxcursor-dev \
+          libxinerama-dev \
+          mesa-common-dev \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev
+
+    - name: Install macOS dependencies
+      if: runner.os == 'macOS'
+      run: |
+        brew install cmake
+
+    - name: Create external directory
+      run: mkdir -p external
+
+    - name: Clone raylib
+      run: |
+        git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git external/raylib
+
+    - name: Clone raygui
+      run: |
+        git clone --depth 1 https://github.com/raysan5/raygui.git external/raygui
+
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cmake -B build -G "${{ matrix.config.generators }}" -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }}
+
+    - name: Configure CMake (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        cmake -B build -G "${{ matrix.config.generators }}" -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }}
+      env:
+        CC: ${{ matrix.config.cc }}
+        CXX: ${{ matrix.config.cxx }}
+
+    - name: Build
+      run: cmake --build build --config ${{ matrix.config.build_type }} --parallel
+
+    - name: Prepare package (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        mkdir package
+        copy build\Release\curvebug.exe package\
+        echo "CurveBug - raylib Edition" > package\README.txt
+        echo "Built on %date% %time%" >> package\README.txt
+        echo "" >> package\README.txt
+        echo "Usage: curvebug.exe" >> package\README.txt
+        echo "Default serial port: COM4" >> package\README.txt
+        echo "Press F1 for settings" >> package\README.txt
+      shell: cmd
+
+    - name: Prepare package (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        mkdir package
+        cp build/curvebug package/
+        chmod +x package/curvebug
+        cat > package/README.txt << EOF
+        CurveBug - raylib Edition
+        Built on $(date)
+        
+        Usage: ./curvebug
+        Default serial port: /dev/ttyUSB0
+        Press F1 for settings
+        
+        Note: You may need to add your user to the dialout group:
+        sudo usermod -a -G dialout \$USER
+        EOF
+
+    - name: Prepare package (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        mkdir package
+        cp build/curvebug package/
+        chmod +x package/curvebug
+        cat > package/README.txt << EOF
+        CurveBug - raylib Edition
+        Built on $(date)
+        
+        Usage: ./curvebug
+        Default serial port: /dev/cu.usbserial
+        Press F1 for settings
+        EOF
+
+    - name: Create archive (Windows)
+      if: runner.os == 'Windows'
+      run: 7z a ${{ matrix.config.artifact }}.zip ./package/*
+      
+    - name: Create archive (Unix)
+      if: runner.os != 'Windows'
+      run: tar czf ${{ matrix.config.artifact }}.tar.gz -C package .
+
+    - name: Upload artifact (Windows)
+      if: runner.os == 'Windows'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.config.artifact }}
+        path: ${{ matrix.config.artifact }}.zip
+        retention-days: 30
+
+    - name: Upload artifact (Unix)
+      if: runner.os != 'Windows'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.config.artifact }}
+        path: ${{ matrix.config.artifact }}.tar.gz
+        retention-days: 30
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+      
+    - name: Display structure
+      run: ls -R artifacts
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/curvebug-windows-x64/*.zip
+          artifacts/curvebug-linux-x64/*.tar.gz
+          artifacts/curvebug-macos-universal/*.tar.gz
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

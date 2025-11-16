@@ -1,0 +1,4 @@
+/.vscode
+/build
+/external/raygui
+/external/raylib

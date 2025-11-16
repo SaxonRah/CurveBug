@@ -1,0 +1,99 @@
+name: Build CurveBug
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: curvebug-windows
+            executable: curvebug.exe
+          - os: ubuntu-latest
+            artifact_name: curvebug-linux
+            executable: curvebug
+          - os: macos-latest
+            artifact_name: curvebug-macos
+            executable: curvebug
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev
+
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake
+
+    - name: Clone raylib
+      run: |
+        git clone https://github.com/raysan5/raylib.git external/raylib
+        cd external/raylib
+        git checkout 5.0
+
+    - name: Clone raygui
+      run: |
+        git clone https://github.com/raysan5/raygui.git external/raygui
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: |
+        cmake --build build --config Release
+
+    - name: Prepare artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir artifacts
+        copy build\Release\${{ matrix.executable }} artifacts\
+      shell: cmd
+
+    - name: Prepare artifacts (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        mkdir -p artifacts
+        cp build/${{ matrix.executable }} artifacts/
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: artifacts/${{ matrix.executable }}
+        retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          curvebug-windows/curvebug.exe
+          curvebug-linux/curvebug
+          curvebug-macos/curvebug
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
