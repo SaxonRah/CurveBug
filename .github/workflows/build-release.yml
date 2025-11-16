@@ -26,7 +26,6 @@ jobs:
             build_type: "Release"
             cc: "cl"
             cxx: "cl"
-            archiver: "7z a"
             generators: "Visual Studio 17 2022"
             
           - name: "Ubuntu GCC"
@@ -35,7 +34,6 @@ jobs:
             build_type: "Release"
             cc: "gcc"
             cxx: "g++"
-            archiver: "tar czf"
             generators: "Unix Makefiles"
             
           - name: "macOS Clang"
@@ -44,7 +42,6 @@ jobs:
             build_type: "Release"
             cc: "clang"
             cxx: "clang++"
-            archiver: "tar czf"
             generators: "Unix Makefiles"
 
     steps:
@@ -85,7 +82,21 @@ jobs:
 
     - name: Clone raygui
       run: |
-        git clone --depth 1 https://github.com/raysan5/raygui.git external/raygui
+        git clone --depth 1 --branch 4.0 https://github.com/raysan5/raygui.git external/raygui
+
+    # FIX: Patch raylib CMakeLists.txt for macOS compatibility
+    - name: Patch raylib CMakeLists (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        sed -i '' '1s/.*/cmake_minimum_required(VERSION 3.15)/' external/raylib/CMakeLists.txt
+      shell: bash
+
+    # FIX: Patch raylib CMakeLists.txt for Linux
+    - name: Patch raylib CMakeLists (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sed -i '1s/.*/cmake_minimum_required(VERSION 3.15)/' external/raylib/CMakeLists.txt
+      shell: bash
 
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
@@ -108,12 +119,11 @@ jobs:
       run: |
         mkdir package
         copy build\Release\curvebug.exe package\
-        echo "CurveBug - raylib Edition" > package\README.txt
-        echo "Built on %date% %time%" >> package\README.txt
-        echo "" >> package\README.txt
-        echo "Usage: curvebug.exe" >> package\README.txt
-        echo "Default serial port: COM4" >> package\README.txt
-        echo "Press F1 for settings" >> package\README.txt
+        echo CurveBug - raylib Edition > package\README.txt
+        echo. >> package\README.txt
+        echo Usage: curvebug.exe >> package\README.txt
+        echo Default serial port: COM4 >> package\README.txt
+        echo Press F1 for settings >> package\README.txt
       shell: cmd
 
     - name: Prepare package (Linux)
