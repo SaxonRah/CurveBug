@@ -1,6 +1,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 void ConfigSetDarkMode(Config* config) {
     config->bg_color = (Color){0, 0, 0, 255};
