@@ -2,6 +2,8 @@
 
 A cross-platform curve tracer viewer for the vintageTEK CurveBug hardware. Rewritten in C with raylib for minimal dependencies and maximum performance.
 
+[![Build CurveBug](https://github.com/SaxonRah/CurveBug/actions/workflows/build.yml/badge.svg)](https://github.com/SaxonRah/CurveBug/actions/workflows/build.yml) [![Build and Release](https://github.com/SaxonRah/CurveBug/actions/workflows/build-release.yml/badge.svg)](https://github.com/SaxonRah/CurveBug/actions/workflows/build-release.yml)
+
 ## Features
 
 - **Real-time I-V curve plotting** with dual DUT support
