@@ -1,0 +1,86 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: "Ubuntu GCC"
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libx11-dev \
+          libxrandr-dev \
+          libxi-dev \
+          libxcursor-dev \
+          libxinerama-dev \
+          mesa-common-dev \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev
+
+    - name: Create external directory
+      run: mkdir -p external
+
+    - name: Clone raylib
+      run: |
+        git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git external/raylib
+
+    - name: Clone raygui
+      run: |
+        git clone --depth 1 --branch 4.0 https://github.com/raysan5/raygui.git external/raygui
+
+    - name: Patch raylib CMakeLists
+      run: |
+        sed -i '1s/.*/cmake_minimum_required(VERSION 3.15)/' external/raylib/CMakeLists.txt
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+      env:
+        CC: gcc
+        CXX: g++
+
+    - name: Build
+      run: cmake --build build --config Release --parallel
+
+    - name: Prepare package
+      run: |
+        mkdir package
+        cp build/curvebug package/
+        chmod +x package/curvebug
+        cat > package/README.txt << EOF
+        CurveBug - raylib Edition
+        Built on $(date)
+        
+        Usage: ./curvebug
+        Default serial port: /dev/ttyUSB0
+        Press F1 for settings
+        
+        Note: You may need to add your user to the dialout group:
+        sudo usermod -a -G dialout \$USER
+        EOF
+
+    - name: Create archive
+      run: tar czf curvebug-linux-x64.tar.gz -C package .
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: curvebug-linux-x64
+        path: curvebug-linux-x64.tar.gz
+        retention-days: 30

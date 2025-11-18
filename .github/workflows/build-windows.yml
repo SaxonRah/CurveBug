@@ -1,0 +1,61 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: "Windows MSVC"
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Create external directory
+      run: mkdir -p external
+
+    - name: Clone raylib
+      run: |
+        git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git external/raylib
+
+    - name: Clone raygui
+      run: |
+        git clone --depth 1 --branch 4.0 https://github.com/raysan5/raygui.git external/raygui
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release --parallel
+
+    - name: Prepare package
+      run: |
+        mkdir package
+        copy build\Release\curvebug.exe package\
+        echo CurveBug - raylib Edition > package\README.txt
+        echo. >> package\README.txt
+        echo Usage: curvebug.exe >> package\README.txt
+        echo Default serial port: COM4 >> package\README.txt
+        echo Press F1 for settings >> package\README.txt
+      shell: cmd
+
+    - name: Create archive
+      run: 7z a curvebug-windows-x64.zip ./package/*
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: curvebug-windows-x64
+        path: curvebug-windows-x64.zip
+        retention-days: 30
