@@ -2,7 +2,9 @@
 
 A cross-platform curve tracer viewer for the vintageTEK CurveBug hardware. Rewritten in C with raylib for minimal dependencies and maximum performance.
 
-[![Build CurveBug](https://github.com/SaxonRah/CurveBug/actions/workflows/build.yml/badge.svg)](https://github.com/SaxonRah/CurveBug/actions/workflows/build.yml) [![Build and Release](https://github.com/SaxonRah/CurveBug/actions/workflows/build-release.yml/badge.svg)](https://github.com/SaxonRah/CurveBug/actions/workflows/build-release.yml)
+![Windows](https://github.com/SaxonRah/CurveBug/actions/workflows/build-windows.yml/badge.svg)
+![Linux](https://github.com/SaxonRah/CurveBug/actions/workflows/build-linux.yml/badge.svg)
+![macOS](https://github.com/SaxonRah/CurveBug/actions/workflows/build-macos.yml/badge.svg)
 
 ## Features
 
